@@ -7,7 +7,8 @@ import httpx
 
 class LLMService:
     def __init__(self) -> None:
-        self.provider = os.getenv("AI_PROVIDER", "openai").lower()
+        configured_provider = os.getenv("AI_PROVIDER", "openai").lower()
+        self.provider = configured_provider if configured_provider in {"openai", "gemini"} else "openai"
         self.model = os.getenv("AI_MODEL", "gpt-4o-mini")
         self.openai_key = os.getenv("OPENAI_API_KEY", "")
         self.gemini_key = os.getenv("GEMINI_API_KEY", "")
@@ -17,15 +18,18 @@ class LLMService:
         if not question:
             return "Please provide a question."
 
-        if self.provider == "openai" and self.openai_key:
-            answer = await self._openai_chat(question)
-            if answer:
-                return answer
-
-        if self.provider == "gemini" and self.gemini_key:
-            answer = await self._gemini_chat(question)
-            if answer:
-                return answer
+        providers = (
+            ["openai", "gemini"] if self.provider == "openai" else ["gemini", "openai"]
+        )
+        for provider in providers:
+            if provider == "openai" and self.openai_key:
+                answer = await self._openai_chat(question)
+                if answer:
+                    return answer
+            if provider == "gemini" and self.gemini_key:
+                answer = await self._gemini_chat(question)
+                if answer:
+                    return answer
 
         return (
             "This is a local fallback answer because no AI API key is configured. "
@@ -34,7 +38,10 @@ class LLMService:
 
     async def _openai_chat(self, prompt: str) -> str:
         url = "https://api.openai.com/v1/chat/completions"
-        headers = {"Authorization": "Be" + "arer " + self.openai_key}
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + self.openai_key,
+        }
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
